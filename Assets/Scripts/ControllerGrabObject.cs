@@ -4,12 +4,9 @@ using UnityEngine;
 
 public class ControllerGrabObject : MonoBehaviour
 {
-    [HideInInspector]
-    public GameObject otherObject;
-    [HideInInspector]
-    public GameObject objectInHand;
     private SteamVR_TrackedObject trackedObject;
-
+    private GameObject pickup;
+    
     public SteamVR_Controller.Device Controller
     {
         get { return SteamVR_Controller.Input((int)trackedObject.index); }
@@ -20,66 +17,31 @@ public class ControllerGrabObject : MonoBehaviour
     }
     private void Update()
     {
-        if (Controller.GetHairTriggerDown())
-            if (otherObject)
-                Grab();
-        if (Controller.GetHairTriggerUp())
-            if (objectInHand)
-                Drop();
-    }
-    public void Grab()
-    {
-        //Move Object to hand
-        objectInHand = otherObject;
-        otherObject = null;
-        //Adds new joint that connects object to hand
-        var joint = AddFixedJoint();
-        //Add to controller
-        joint.connectedBody = objectInHand.GetComponent<Rigidbody>();
-    }
-
-    private FixedJoint AddFixedJoint()
-    {
-        //Create new joint and makes it so it does not break easy
-        FixedJoint fx = gameObject.AddComponent<FixedJoint>();
-        fx.breakForce = 20000;
-        fx.breakTorque = 20000;
-        return fx;
-    }
-
-    public void Drop()
-    {
-        if (GetComponent<FixedJoint>())
+        if (Controller == null)
         {
-            GetComponent<FixedJoint>().connectedBody = null;
-            Destroy(GetComponent<FixedJoint>());
-            objectInHand.GetComponent<Rigidbody>().velocity = Controller.velocity;
-            objectInHand.GetComponent<Rigidbody>().angularVelocity = Controller.angularVelocity;
+            Debug.Log("Controller not initialized");
+            return;
         }
-        objectInHand = null;
+
+        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Grip) && pickup != null)
+        {
+            pickup.transform.parent = this.transform;
+            pickup.GetComponent<Rigidbody>().useGravity = false;
+        }
+        if (Controller.GetPressUp(SteamVR_Controller.ButtonMask.Grip) && pickup != null)
+        {
+            pickup.transform.parent = null;
+            pickup.GetComponent<Rigidbody>().useGravity = true;
+        }
+    }
+    private void OnTriggerEnter(Collider collider)
+    {
+        pickup = collider.gameObject;
     }
 
-    private void SetCollidingObject(Collider col)
+    // Remove all items no longer colliding with to avoid further processing
+    private void OnTriggerExit(Collider collider)
     {
-        if (otherObject || !col.GetComponent<Rigidbody>())
-            return;
-        otherObject = col.gameObject;
-    }
-
-    public void OnTriggerExit(Collider other)
-    {
-        if (!otherObject)
-            return;
-        otherObject = null;
-    }
-
-    public void OnTriggerEnter(Collider other)
-    {
-        SetCollidingObject(other);
-    }
-
-    public void OnTriggerStay(Collider other)
-    {
-        SetCollidingObject(other);
+        pickup = null;
     }
 }
